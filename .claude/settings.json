@@ -1,0 +1,42 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm --version)",
+      "Bash(npx --yes create-next-app@14 _scaffold --typescript --app --no-tailwind --src-dir --import-alias \"@/*\" --eslint --skip-install --use-npm)",
+      "Bash(npx --yes create-next-app@14 scaffold-tmp --typescript --app --no-tailwind --src-dir --import-alias \"@/*\" --eslint --skip-install --use-npm)",
+      "Read(//d/d/2026/Claude_Projects/**)",
+      "Read(//d/d/2026/Claude_Projects/CSU_CRM/**)",
+      "Bash(rm -rf scaffold-tmp)",
+      "Bash(npm install *)",
+      "Bash(node -e \"const p=require\\('./package.json'\\); console.log\\('prisma', p.devDependencies.prisma\\); console.log\\('@prisma/client', p.dependencies['@prisma/client']\\); console.log\\('@types/papaparse', p.devDependencies['@types/papaparse']\\);\")",
+      "Bash(npx prisma *)",
+      "Bash(npm run *)",
+      "Bash(docker --version)",
+      "Bash(docker compose *)",
+      "Bash(docker info *)",
+      "PowerShell($d = Get-Command docker -ErrorAction SilentlyContinue; if \\($d\\) { \"docker EN PATH: $\\($d.Source\\)\"; docker --version } else { \"docker NO está en PATH\" }; if \\(Test-Path \"$env:ProgramFiles\\\\Docker\\\\Docker\\\\Docker Desktop.exe\"\\) { \"Docker Desktop INSTALADO en Program Files\" } else { \"Docker Desktop NO encontrado en Program Files\" })",
+      "Bash(npx tsc *)",
+      "Bash(echo \"=== tsc exit: $? ===\")",
+      "PowerShell(\"--- DATABASE_URL en el entorno del shell \\(si existe, pisa al .env\\) ---\"; if \\($env:DATABASE_URL\\) { \"SHELL DATABASE_URL = $env:DATABASE_URL\" } else { \"no hay DATABASE_URL en el shell\" }; \"--- a nivel usuario/maquina ---\"; [System.Environment]::GetEnvironmentVariable\\('DATABASE_URL','User'\\); [System.Environment]::GetEnvironmentVariable\\('DATABASE_URL','Machine'\\))",
+      "PowerShell($env:DATABASE_URL = \"postgresql://bex:bex@127.0.0.1:5432/bex_crm?schema=public\"; npx prisma migrate dev --name init 2>&1 | Select-Object -First 25)",
+      "PowerShell(docker run --rm -e PGPASSWORD=bex postgres:15 psql -h host.docker.internal -p 5432 -U bex -d bex_crm -c \"select 'host-path OK' as result;\" 2>&1)",
+      "PowerShell(docker exec -e PGPASSWORD=bex bex-crm-db psql -U bex -d bex_crm -t -c \"show password_encryption;\" 2>&1)",
+      "PowerShell(\"--- Cliente externo -> host.docker.internal:5432 \\(mismo camino que usa Prisma\\) ---\")",
+      "PowerShell(\"--- M�todo de auth configurado en el server ---\")",
+      "PowerShell(docker exec bex-crm-db psql -U bex -d bex_crm -c \"ALTER USER bex WITH PASSWORD 'bex';\" 2>&1)",
+      "PowerShell(\"--- Reset expl�cito del password de bex ---\")",
+      "PowerShell(\"--- Reintento del camino externo ---\")",
+      "PowerShell(\"--- Quién es PID 9840 ---\"; Get-Process -Id 9840 -ErrorAction SilentlyContinue | Select-Object Id, ProcessName, Path | Format-List; \"--- Todos los procesos postgres nativos ---\"; Get-Process -Name postgres -ErrorAction SilentlyContinue | Select-Object Id, Path | Format-Table -Auto; \"--- Servicios con 'sql' o 'postg' ---\"; Get-Service | Where-Object { $_.Name -match 'postg|sql' } | Select-Object Name, Status, DisplayName | Format-Table -Auto)",
+      "PowerShell(docker compose up -d 2>&1)",
+      "PowerShell(docker compose ps)",
+      "PowerShell(docker run --rm -e PGPASSWORD=bex postgres:15 psql -h host.docker.internal -p 5433 -U bex -d bex_crm -c \"select 'OK puerto 5433' as result;\" 2>&1)",
+      "PowerShell(\"--- estado ---\")",
+      "PowerShell(\"--- verificaci�n camino externo en 5433 ---\")",
+      "PowerShell(npx prisma migrate dev --name init 2>&1)",
+      "PowerShell(npm run dev)",
+      "PowerShell($ready=$false; for \\($i=0; $i -lt 30; $i++\\) { try { $r = Invoke-WebRequest -Uri \"http://localhost:3000/login\" -UseBasicParsing -TimeoutSec 3; \"HTTP $\\($r.StatusCode\\) en /login\"; $ready=$true; break } catch { Start-Sleep -Seconds 2 } }; if \\(-not $ready\\) { \"Aún no responde; reviso log:\"; Get-Content \"C:\\\\Users\\\\johang\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\d--2026-Claude-Projects-CSU-CRM\\\\e8e766a5-1a4d-492c-b2c3-8ba2e65fc606\\\\tasks\\\\b58axcule.output\" -Tail 20 })",
+      "PowerShell(try { $r = Invoke-WebRequest -Uri \"http://localhost:3000/\" -UseBasicParsing -MaximumRedirection 0 -TimeoutSec 5 } catch { $r = $_.Exception.Response }; if \\($r.StatusCode\\) { \"GET / -> HTTP $\\([int]$r.StatusCode\\) $\\($r.StatusCode\\)\"; $loc = $r.Headers[\"Location\"]; if \\($loc\\) { \"Location: $loc\" } } else { \"sin respuesta\" })",
+      "PowerShell(npm run build 2>&1)"
+    ]
+  }
+}

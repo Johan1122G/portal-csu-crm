@@ -1,0 +1,26 @@
+# Postgres local para desarrollo del BEX CRM.
+# Levantar con:  docker compose up -d
+# La cadena de conexión correspondiente está en .env.example (DATABASE_URL).
+services:
+  db:
+    image: postgres:15
+    container_name: bex-crm-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: bex
+      POSTGRES_PASSWORD: bex
+      POSTGRES_DB: bex_crm
+    # Host 5433 → contenedor 5432. Se usa 5433 porque hay un PostgreSQL nativo
+    # ocupando el 5432 en este equipo. Mantiene el contenedor aislado y sin conflicto.
+    ports:
+      - "5433:5432"
+    volumes:
+      - bex_crm_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U bex -d bex_crm"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  bex_crm_pgdata:

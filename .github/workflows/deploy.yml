@@ -1,0 +1,44 @@
+name: Deploy Portal CSU
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch: # permite lanzarlo a mano desde la pestaña Actions
+
+env:
+  AZURE_WEBAPP_NAME: bext-crm-portalcsu
+  NODE_VERSION: "22"
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: "npm"
+
+      # Instala deps (postinstall corre `prisma generate` con binaryTargets de Linux)
+      - run: npm ci
+
+      # Build de Next standalone. AUTH_SECRET de un solo uso para el build;
+      # el real (y todas las vars) viven en App Service → Configuration.
+      - name: Build
+        run: AUTH_SECRET=$(openssl rand -base64 32) npm run build
+
+      # El standalone NO trae public/, .next/static ni el engine de Prisma → copiarlos
+      - name: Empaquetar standalone
+        run: |
+          cp -r public .next/standalone/
+          cp -r .next/static .next/standalone/.next/static
+          cp -r node_modules/.prisma .next/standalone/node_modules/.prisma
+          cp -r node_modules/@prisma/client .next/standalone/node_modules/@prisma/client
+
+      - name: Deploy a Azure App Service
+        uses: azure/webapps-deploy@v3
+        with:
+          app-name: ${{ env.AZURE_WEBAPP_NAME }}
+          publish-profile: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}
+          package: .next/standalone
