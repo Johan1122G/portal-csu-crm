@@ -28,10 +28,11 @@ jobs:
       - name: Build
         run: AUTH_SECRET=$(openssl rand -base64 32) npm run build
 
-      # El standalone NO trae public/, .next/static ni el engine de Prisma → copiarlos
+      # El standalone NO trae public/, .next/static ni el engine de Prisma → copiarlos.
+      # public/ es opcional (este proyecto puede no tenerla).
       - name: Empaquetar standalone
         run: |
-          cp -r public .next/standalone/
+          [ -d public ] && cp -r public .next/standalone/ || echo "sin carpeta public/"
           cp -r .next/static .next/standalone/.next/static
           cp -r node_modules/.prisma .next/standalone/node_modules/.prisma
           cp -r node_modules/@prisma/client .next/standalone/node_modules/@prisma/client
