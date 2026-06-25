@@ -6,7 +6,6 @@ import {
   makeStyles,
   tokens,
   Card,
-  Text,
   Button,
   Spinner,
   Badge,
