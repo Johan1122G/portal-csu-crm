@@ -16,6 +16,8 @@ import {
   PulseSquare24Filled,
   Alert24Regular,
   Alert24Filled,
+  DataTrending24Regular,
+  DataTrending24Filled,
   Settings24Regular,
   Settings24Filled,
 } from "@fluentui/react-icons"
@@ -53,6 +55,12 @@ const NAV: NavEntry[] = [
     label: "Digest diario",
     Icon: Alert24Regular,
     IconActive: Alert24Filled,
+  },
+  {
+    href: "/benchmark",
+    label: "Benchmark",
+    Icon: DataTrending24Regular,
+    IconActive: DataTrending24Filled,
   },
   { href: "/configuracion", label: "Configuración", Icon: Settings24Regular, IconActive: Settings24Filled },
 ]
