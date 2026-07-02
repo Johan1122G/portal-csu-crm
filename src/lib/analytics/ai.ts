@@ -256,6 +256,171 @@ export async function answerClientQuestion(input: {
   return { respuesta: json?.choices?.[0]?.message?.content ?? "No pude completar la respuesta.", consultas }
 }
 
+// ─── QBR: narrativa ejecutiva ────────────────────────────────────────────────────
+// Redacta el texto del Quarterly Business Review a partir de métricas ya calculadas.
+// No inventa números; produce resumen ejecutivo, logros y próximos pasos.
+export type QbrNarrative = {
+  resumenEjecutivo: string
+  logros: string[]
+  proximosPasos: string[]
+}
+
+const QbrNarrativeSchema = z.object({
+  resumenEjecutivo: z.string().default(""),
+  logros: z.array(z.string()).default([]),
+  proximosPasos: z.array(z.string()).default([]),
+})
+
+export async function generateQbrNarrative(payload: unknown): Promise<QbrNarrative | null> {
+  const cfg = tryReadConfig()
+  if (!cfg) return null
+  const url = `${cfg.endpoint}/openai/deployments/${cfg.deployment}/chat/completions?api-version=${cfg.apiVersion}`
+
+  const system = `Eres CSM senior de BEXTechnology (Managed Services). Redactas el texto de un Quarterly Business Review (QBR) para presentar a un cliente, a partir de MÉTRICAS YA CALCULADAS de su soporte y contexto.
+Reglas:
+- NO inventes ni recalcules cifras; usa solo las que se te dan. Si un dato falta, no lo menciones.
+- resumenEjecutivo: 3-4 frases, tono profesional y positivo pero honesto.
+- logros: 2-4 viñetas de valor entregado en el período (basadas en tickets resueltos, horas, mejoras).
+- proximosPasos: 2-4 viñetas accionables para el próximo período (renovaciones, assessments, mejoras).
+Responde SOLO JSON: {"resumenEjecutivo","logros":[],"proximosPasos":[]}`
+
+  try {
+    const res = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "api-key": cfg.apiKey },
+      cache: "no-store",
+      body: JSON.stringify({
+        messages: [
+          { role: "system", content: system },
+          { role: "user", content: JSON.stringify(payload) },
+        ],
+        temperature: 0.3,
+        max_tokens: 900,
+        response_format: { type: "json_object" },
+      }),
+    })
+    const json = (await res.json().catch(() => null)) as { choices?: { message?: { content?: string } }[] } | null
+    const content = json?.choices?.[0]?.message?.content
+    if (!content) return null
+    const parsed = QbrNarrativeSchema.safeParse(JSON.parse(content))
+    return parsed.success ? parsed.data : null
+  } catch {
+    return null // el QBR se renderiza igual sin narrativa
+  }
+}
+
+// ─── Digest diario: intro narrativa breve ────────────────────────────────────────
+// Recibe los conteos YA calculados del digest y redacta un párrafo ejecutivo para
+// abrir el resumen. No inventa datos: solo usa los conteos que se le pasan.
+export async function generateDigestIntro(resumen: {
+  totalClientes: number
+  enRojo: number
+  renovaciones: number
+  bolsas: number
+  sinContacto: number
+  topRiesgos: string[]
+}): Promise<string | null> {
+  const cfg = tryReadConfig()
+  if (!cfg) return null
+  const url = `${cfg.endpoint}/openai/deployments/${cfg.deployment}/chat/completions?api-version=${cfg.apiVersion}`
+
+  const system = `Eres el asistente de Customer Success de BEXTechnology. Redacta un párrafo BREVE (2-3 frases) que abra el digest diario del CSM, resaltando lo más urgente. Usa SOLO los conteos que se te dan; no inventes. Tono directo y accionable, en español.`
+  try {
+    const res = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "api-key": cfg.apiKey },
+      cache: "no-store",
+      body: JSON.stringify({
+        messages: [
+          { role: "system", content: system },
+          { role: "user", content: JSON.stringify(resumen) },
+        ],
+        temperature: 0.4,
+        max_tokens: 220,
+      }),
+    })
+    const json = (await res.json().catch(() => null)) as { choices?: { message?: { content?: string } }[] } | null
+    return json?.choices?.[0]?.message?.content?.trim() ?? null
+  } catch {
+    return null // el digest funciona sin intro
+  }
+}
+
+// ─── Acciones sugeridas (borradores para el CSM) ─────────────────────────────────
+// A partir de los agregados + la salud + el contexto, la IA propone las próximas
+// acciones concretas (tareas) que el CSM debería ejecutar. NO se crean solas: se
+// devuelven como borradores para que el CSM apruebe las que quiera (crea Tasks).
+
+export type SuggestedAction = {
+  titulo: string
+  detalle: string
+  prioridad: string // Alta | Media | Baja
+}
+
+const SuggestedActionSchema = z.object({
+  titulo: z.string(),
+  detalle: z.string().default(""),
+  prioridad: z.string().default("Media"),
+})
+const SuggestionsSchema = z.object({ acciones: z.array(SuggestedActionSchema) })
+
+const ACCIONES_SYSTEM = `Eres CSM senior de BEXTechnology (Managed Services: Azure, Microsoft 365, identidad, seguridad, soporte).
+Recibes la SALUD y MÉTRICAS ya calculadas de un cliente. Propón las PRÓXIMAS ACCIONES concretas y accionables que el CSM debería ejecutar para mejorar o proteger la cuenta.
+Reglas:
+- NO inventes números; básate solo en las señales que se te dan (drivers en mal estado, bolsa por agotarse, renovaciones próximas, días sin contacto, tickets al alza, CSAT bajo).
+- Cada acción debe ser una TAREA ejecutable por una persona (verbo de acción), no un análisis genérico.
+- Prioriza lo urgente/de mayor impacto. Máximo 5 acciones.
+- prioridad ∈ {Alta, Media, Baja}. Responde en español.
+Responde SOLO JSON: {"acciones":[{"titulo","detalle","prioridad"}]}`
+
+export async function suggestActions(input: {
+  analytics: ClientAnalytics
+  context: ClientContext
+  // Señales de salud ya calculadas (drivers, bolsa, engagement, renovaciones).
+  salud: unknown
+}): Promise<SuggestedAction[]> {
+  const cfg = tryReadConfig()
+  if (!cfg) throw new Error("Azure OpenAI no está configurado (AZURE_OPENAI_*).")
+  const url = `${cfg.endpoint}/openai/deployments/${cfg.deployment}/chat/completions?api-version=${cfg.apiVersion}`
+
+  const payload = {
+    cliente: {
+      nombre: input.context.name,
+      industria: input.context.industria,
+      estrategico: input.context.estrategico,
+      nivelAdopcion: input.context.nivelAdopcion,
+    },
+    salud: input.salud,
+    resumen: input.analytics.resumen,
+    tendenciaMensual: input.analytics.tendenciaMensual.slice(-6),
+    recurrentes: input.analytics.recurrentes.slice(0, 5),
+  }
+
+  const res = await fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "api-key": cfg.apiKey },
+    cache: "no-store",
+    body: JSON.stringify({
+      messages: [
+        { role: "system", content: ACCIONES_SYSTEM },
+        { role: "user", content: JSON.stringify(payload) },
+      ],
+      temperature: 0.3,
+      max_tokens: 900,
+      response_format: { type: "json_object" },
+    }),
+  })
+  const json = (await res.json().catch(() => null)) as
+    | { choices?: { message?: { content?: string } }[]; error?: { message?: string } }
+    | null
+  if (!res.ok || !json) throw new Error(`Azure OpenAI devolvió ${res.status}: ${json?.error?.message ?? "error"}`)
+  const content = json.choices?.[0]?.message?.content
+  if (!content) throw new Error("La IA no devolvió contenido.")
+  const parsed = SuggestionsSchema.safeParse(JSON.parse(content))
+  if (!parsed.success) throw new Error("La respuesta de la IA no tiene el formato esperado.")
+  return parsed.data.acciones.slice(0, 5)
+}
+
 // ─── 8b: Análisis IA de una reunión (transcripción / notas Copilot) ──────────────
 export type MeetingAnalysis = {
   resumen: string

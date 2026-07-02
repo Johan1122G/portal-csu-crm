@@ -17,7 +17,7 @@ import {
   TableBody,
   TableCell,
 } from "@fluentui/react-components"
-import { StarFilled, EditRegular } from "@fluentui/react-icons"
+import { StarFilled, EditRegular, DocumentTextRegular } from "@fluentui/react-icons"
 import { format } from "date-fns"
 import Link from "next/link"
 import { StatusBadge } from "@/components/shared/StatusBadge"
@@ -31,8 +31,8 @@ import { ProductosTab } from "@/components/clientes/tabs/ProductosTab"
 import { RelacionamientoTab } from "@/components/clientes/tabs/RelacionamientoTab"
 import { TicketsTab } from "@/components/clientes/tabs/TicketsTab"
 import { ReunionesTab } from "@/components/clientes/tabs/ReunionesTab"
-import { ImportarTab } from "@/components/clientes/tabs/ImportarTab"
 import { InsightsTab } from "@/components/clientes/tabs/InsightsTab"
+import { TareasTab } from "@/components/clientes/tabs/TareasTab"
 import type { AccountWithRelations } from "@/types"
 
 const useStyles = makeStyles({
@@ -71,8 +71,8 @@ type TabKey =
   | "oportunidades"
   | "tickets"
   | "insights"
+  | "plan"
   | "reuniones"
-  | "importar"
 
 export function Cliente360({ cliente }: { cliente: AccountWithRelations }) {
   const styles = useStyles()
@@ -95,6 +95,11 @@ export function Cliente360({ cliente }: { cliente: AccountWithRelations }) {
             <Link href={`/clientes/${cliente.id}/editar`}>
               <Button appearance="secondary" icon={<EditRegular />}>
                 Editar
+              </Button>
+            </Link>
+            <Link href={`/clientes/${cliente.id}/qbr`}>
+              <Button appearance="secondary" icon={<DocumentTextRegular />}>
+                QBR
               </Button>
             </Link>
             <ExportButton
@@ -125,8 +130,8 @@ export function Cliente360({ cliente }: { cliente: AccountWithRelations }) {
         <Tab value="oportunidades">Oportunidades ({cliente.opportunities.length})</Tab>
         <Tab value="tickets">Tickets (GLPI)</Tab>
         <Tab value="insights">Insights (IA)</Tab>
+        <Tab value="plan">Plan / Tareas</Tab>
         <Tab value="reuniones">Reuniones (Teams)</Tab>
-        <Tab value="importar">Importar datos</Tab>
       </TabList>
 
       {/* General */}
@@ -239,13 +244,11 @@ export function Cliente360({ cliente }: { cliente: AccountWithRelations }) {
       {/* Insights (IA) */}
       {tab === "insights" && <InsightsTab accountId={cliente.id} />}
 
+      {/* Plan / Tareas (playbooks + acciones sugeridas) */}
+      {tab === "plan" && <TareasTab accountId={cliente.id} />}
+
       {/* Reuniones (Teams) */}
       {tab === "reuniones" && <ReunionesTab accountId={cliente.id} />}
-
-      {/* Importar datos */}
-      {tab === "importar" && (
-        <ImportarTab accountId={cliente.id} accountNumber={cliente.accountnumber} />
-      )}
     </>
   )
 }

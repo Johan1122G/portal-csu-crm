@@ -9,9 +9,14 @@ import type { ClientContext } from "@/lib/analytics/context"
 
 export type HealthDriver = { nombre: string; estado: "bueno" | "neutral" | "malo"; detalle: string; subscore: number | null }
 
+export type HealthColor = "verde" | "amarillo" | "rojo" | "gris"
+
 export type ClientHealth = {
-  score: number
-  color: "verde" | "amarillo" | "rojo"
+  // score/color = null/"gris" cuando NO hay señal suficiente para calcular salud
+  // (cliente con tickets pero sin CSAT/bolsa/adopción/engagement registrados).
+  // Evita falsos "rojos" mientras los datos se alimentan poco a poco.
+  score: number | null
+  color: HealthColor
   drivers: HealthDriver[]
   bolsa: {
     contratadas: number | null
@@ -198,8 +203,16 @@ export async function computeClientHealth(
     acc += d.subscore * w
     pesoTotal += w
   }
-  const score = pesoTotal > 0 ? Math.round(acc / pesoTotal) : 0
-  const color: ClientHealth["color"] = score >= 70 ? "verde" : score >= 40 ? "amarillo" : "rojo"
+  // Sin ningún driver con dato → salud indeterminada (gris), no "rojo".
+  const tieneSenal = pesoTotal > 0
+  const score = tieneSenal ? Math.round(acc / pesoTotal) : null
+  const color: HealthColor = !tieneSenal
+    ? "gris"
+    : score! >= 70
+      ? "verde"
+      : score! >= 40
+        ? "amarillo"
+        : "rojo"
 
   return {
     score,

@@ -27,8 +27,8 @@ type PortfolioRow = {
   name: string
   estado: string | null
   estrategico: boolean
-  score: number
-  color: "verde" | "amarillo" | "rojo"
+  score: number | null
+  color: "verde" | "amarillo" | "rojo" | "gris"
   topRiesgo: string | null
   bolsaPct: number | null
   semanasParaAgotar: number | null
@@ -53,7 +53,7 @@ const useStyles = makeStyles({
   link: { color: tokens.colorBrandForeground1, fontWeight: tokens.fontWeightSemibold, textDecoration: "none" },
 })
 
-const bg = (c: string) => (c === "verde" ? "#1f9d55" : c === "amarillo" ? "#c98a00" : "#c0392b")
+const bg = (c: string) => (c === "verde" ? "#1f9d55" : c === "amarillo" ? "#c98a00" : c === "gris" ? "#8a8886" : "#c0392b")
 
 export function CarteraView() {
   const styles = useStyles()
@@ -96,7 +96,7 @@ export function CarteraView() {
 
   const visibles = useMemo(() => {
     const r = rows ?? []
-    return soloRiesgo ? r.filter((x) => x.color !== "verde") : r
+    return soloRiesgo ? r.filter((x) => x.color === "amarillo" || x.color === "rojo") : r
   }, [rows, soloRiesgo])
 
   if (loading) {
@@ -166,7 +166,7 @@ export function CarteraView() {
                 <TableRow key={x.id}>
                   <TableCell>
                     <span className={styles.scoreChip} style={{ background: bg(x.color) }}>
-                      {x.score}
+                      {x.score ?? "—"}
                     </span>
                   </TableCell>
                   <TableCell>

@@ -12,8 +12,8 @@ export type PortfolioRow = {
   name: string
   estado: string | null
   estrategico: boolean
-  score: number
-  color: "verde" | "amarillo" | "rojo"
+  score: number | null
+  color: "verde" | "amarillo" | "rojo" | "gris"
   topRiesgo: string | null
   bolsaPct: number | null
   semanasParaAgotar: number | null
@@ -69,6 +69,13 @@ export async function computePortfolio(): Promise<PortfolioRow[]> {
     }
   })
 
-  // Peor salud primero (triage).
-  return rows.filter((r): r is PortfolioRow => r != null).sort((a, b) => a.score - b.score)
+  // Peor salud primero (triage); los de salud indeterminada (null) van al final.
+  return rows
+    .filter((r): r is PortfolioRow => r != null)
+    .sort((a, b) => {
+      if (a.score == null && b.score == null) return 0
+      if (a.score == null) return 1
+      if (b.score == null) return -1
+      return a.score - b.score
+    })
 }

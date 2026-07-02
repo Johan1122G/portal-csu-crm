@@ -14,6 +14,8 @@ import {
   Lightbulb24Filled,
   PulseSquare24Regular,
   PulseSquare24Filled,
+  Alert24Regular,
+  Alert24Filled,
   Settings24Regular,
   Settings24Filled,
 } from "@fluentui/react-icons"
@@ -45,6 +47,12 @@ const NAV: NavEntry[] = [
     label: "Cartera (IA)",
     Icon: PulseSquare24Regular,
     IconActive: PulseSquare24Filled,
+  },
+  {
+    href: "/digest",
+    label: "Digest diario",
+    Icon: Alert24Regular,
+    IconActive: Alert24Filled,
   },
   { href: "/configuracion", label: "Configuración", Icon: Settings24Regular, IconActive: Settings24Filled },
 ]

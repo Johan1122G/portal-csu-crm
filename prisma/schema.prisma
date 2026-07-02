@@ -64,6 +64,8 @@ model Account {
   insightThreads InsightThread[]
   insightFindings InsightFinding[]
   teamsMeetings  TeamsMeetingCache[]
+  tasks         Task[]
+  playbookRuns  PlaybookRun[]
   products      ProductService[]
   activities    CSActivity[]
   opportunities OpportunityRecommendation[]
@@ -300,6 +302,53 @@ model InsightMessage {
 
   @@index([threadId])
   @@map("insight_messages")
+}
+
+// ─── TAREAS y PLAYBOOKS de Customer Success ──────────────────────────────────────
+// Task: unidad de trabajo del CSM (checklist). origen distingue si nació manual,
+// de una acción sugerida por IA, o de un playbook aplicado.
+// PlaybookRun: instancia de un playbook (plantilla) aplicado a un cliente; agrupa
+// las tareas que generó, para dar seguimiento al plan (recuperación, renovación…).
+model PlaybookRun {
+  id         String   @id @default(cuid())
+  accountId  String
+  account    Account  @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  plantilla  String // key del template (ej. recuperacion | renovacion | onboarding)
+  titulo     String
+  estado     String   @default("Activo") // Activo | Completado | Cancelado
+  motivo     String? // por qué se aplicó (ej. "cliente en rojo: satisfacción baja")
+  createdBy  String? // correo del CSM
+  createdon  DateTime @default(now())
+  modifiedon DateTime @updatedAt
+
+  tasks Task[]
+
+  @@index([accountId])
+  @@map("playbook_runs")
+}
+
+model Task {
+  id            String       @id @default(cuid())
+  accountId     String
+  account       Account      @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  playbookRunId String?
+  playbookRun   PlaybookRun? @relation(fields: [playbookRunId], references: [id], onDelete: SetNull)
+
+  titulo      String
+  detalle     String?
+  responsable String? // nombre o correo del responsable
+  prioridad   String? // Alta | Media | Baja
+  estado      String    @default("Pendiente") // Pendiente | En progreso | Hecha | Descartada
+  vence       DateTime?
+  origen      String    @default("Manual") // Manual | IA | Playbook
+  createdBy   String? // correo del CSM que la creó/aprobó
+  completadaOn DateTime?
+  createdon   DateTime  @default(now())
+  modifiedon  DateTime  @updatedAt
+
+  @@index([accountId])
+  @@index([playbookRunId])
+  @@map("tasks")
 }
 
 // Hallazgos generados por IA, guardados para no re-consumir tokens (se reemplazan

@@ -26,6 +26,7 @@ import {
   ChevronLeftRegular,
   ChevronRightRegular,
   ArrowSyncRegular,
+  ArrowUploadRegular,
 } from "@fluentui/react-icons"
 import { StatusBadge } from "@/components/shared/StatusBadge"
 import { EmptyState } from "@/components/shared/EmptyState"
@@ -144,6 +145,13 @@ export function ClienteGrid() {
           onClick={() => router.push("/clientes/sincronizar")}
         >
           Sincronizar desde GLPI
+        </Button>
+        <Button
+          appearance="secondary"
+          icon={<ArrowUploadRegular />}
+          onClick={() => router.push("/clientes/importar")}
+        >
+          Importar datos
         </Button>
         <ExportButton
           url="/api/clientes/export"

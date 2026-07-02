@@ -37,8 +37,8 @@ type EstadoAgg = { estado: string; casos: number }
 type RecurrenteAgg = { tema: string; casos: number }
 type HealthDriver = { nombre: string; estado: "bueno" | "neutral" | "malo"; detalle: string; subscore: number | null }
 type Health = {
-  score: number
-  color: "verde" | "amarillo" | "rojo"
+  score: number | null
+  color: "verde" | "amarillo" | "rojo" | "gris"
   drivers: HealthDriver[]
   bolsa: { contratadas: number | null; consumidas: number | null; pct: number | null; burnRateMensual: number | null; semanasParaAgotar: number | null }
   sla: { incumplidoPct: number; resolucionPromedioHoras: number | null }
@@ -105,7 +105,7 @@ const impactoColor = (i: string): "danger" | "warning" | "success" =>
   /alto/i.test(i) ? "danger" : /medio/i.test(i) ? "warning" : "success"
 const prioridadFromImpacto = (i: string) => (/alto/i.test(i) ? "Alta" : /bajo/i.test(i) ? "Baja" : "Media")
 const fmtNum = (n: number | null) => (n == null ? "—" : String(n))
-const healthBg = (c: string) => (c === "verde" ? "#1f9d55" : c === "amarillo" ? "#c98a00" : "#c0392b")
+const healthBg = (c: string) => (c === "verde" ? "#1f9d55" : c === "amarillo" ? "#c98a00" : c === "gris" ? "#8a8886" : "#c0392b")
 const dotColor = (e: string) => (e === "bueno" ? "#1f9d55" : e === "neutral" ? "#c98a00" : "#c0392b")
 
 export function InsightsTab({ accountId }: { accountId: string }) {
@@ -378,8 +378,8 @@ export function InsightsTab({ accountId }: { accountId: string }) {
           {data.salud && (
             <Card className={styles.health}>
               <div className={styles.scoreCircle} style={{ background: healthBg(data.salud.color) }}>
-                <span className={styles.scoreNum}>{data.salud.score}</span>
-                <span className={styles.scoreLbl}>Salud</span>
+                <span className={styles.scoreNum}>{data.salud.score ?? "—"}</span>
+                <span className={styles.scoreLbl}>{data.salud.color === "gris" ? "Sin datos" : "Salud"}</span>
               </div>
               <div className={styles.drivers}>
                 {data.salud.drivers.map((d) => (
