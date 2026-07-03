@@ -3,13 +3,11 @@ import ExcelJS from "exceljs"
 import Papa from "papaparse"
 import { prisma } from "@/lib/prisma"
 import { requireSession, badRequest, serverError } from "@/lib/api"
-import { coerceValue, esPlaceholder } from "@/lib/import/clientFields"
-import { normHeader, resolveHeader } from "@/lib/import/bulk"
+import { IMPORT_COLUMNS, resolveHeader, coerceCol, esPlaceholder, normHeader, type ImportColumn } from "@/lib/import/bulk"
 
 export const dynamic = "force-dynamic"
 
-// Convierte el valor de una celda de exceljs a texto plano (maneja fechas, fórmulas
-// y rich-text que exceljs devuelve como objetos).
+// Valor de celda exceljs → texto plano (fechas, fórmulas, rich text).
 function cellText(v: unknown): string {
   if (v == null) return ""
   if (v instanceof Date) return v.toISOString().slice(0, 10)
@@ -24,25 +22,18 @@ function cellText(v: unknown): string {
   return String(v)
 }
 
-// Lee el archivo subido (.xlsx o .csv) → { headers, rows } como strings.
-async function readGrid(file: File): Promise<{ headers: string[]; rows: string[][] }>
-{
-  const name = file.name.toLowerCase()
-  if (name.endsWith(".csv")) {
-    const text = await file.text()
-    const parsed = Papa.parse<string[]>(text, { skipEmptyLines: true })
+async function readGrid(file: File): Promise<{ headers: string[]; rows: string[][] }> {
+  if (file.name.toLowerCase().endsWith(".csv")) {
+    const parsed = Papa.parse<string[]>(await file.text(), { skipEmptyLines: true })
     const all = parsed.data as string[][]
     return { headers: (all[0] ?? []).map((h) => (h ?? "").toString()), rows: all.slice(1) }
   }
-  // .xlsx (default)
   const buf = Buffer.from(await file.arrayBuffer())
   const wb = new ExcelJS.Workbook()
-  // Cast: los @types de exceljs esperan un Buffer no-genérico.
   await wb.xlsx.load(buf as unknown as Parameters<typeof wb.xlsx.load>[0])
   const ws = wb.worksheets[0]
   if (!ws) return { headers: [], rows: [] }
-  const headerVals = (ws.getRow(1).values as unknown[]).slice(1) // index 0 va vacío
-  const headers = headerVals.map(cellText)
+  const headers = (ws.getRow(1).values as unknown[]).slice(1).map(cellText)
   const rows: string[][] = []
   ws.eachRow((row, n) => {
     if (n === 1) return
@@ -55,23 +46,22 @@ async function readGrid(file: File): Promise<{ headers: string[]; rows: string[]
 type Resultado = {
   clientesActualizados: number
   camposAplicados: number
+  contactos: number
+  ejecutivos: number
+  contratos: number
   filasSinCambios: number
   noEncontrados: string[]
   ambiguos: string[]
-  detalle: { cliente: string; campos: number }[]
 }
 
-// POST /api/clientes/importar — carga masiva desde un único Excel (una fila por
-// cliente). Match por NIT (si viene) o por NOMBRE exacto (Razón Social). Semántica
-// "rellenar": celdas vacías no borran; nombres/NIT no encontrados se omiten y reportan.
+// POST /api/clientes/importar — carga masiva desde un Excel (una fila por cliente).
 export async function POST(req: NextRequest) {
   const unauth = await requireSession()
   if (unauth) return unauth
 
   let file: File | null = null
   try {
-    const form = await req.formData()
-    const f = form.get("file")
+    const f = (await req.formData()).get("file")
     if (f instanceof File) file = f
   } catch {
     return badRequest("Se espera un archivo (multipart/form-data, campo 'file').")
@@ -85,22 +75,12 @@ export async function POST(req: NextRequest) {
     return badRequest("No se pudo leer el archivo. Usa la plantilla .xlsx (o un .csv con los mismos encabezados).")
   }
 
-  // Mapea columnas por su encabezado.
-  let nombreIdx = -1
-  let nitIdx = -1
-  const fieldCols: { idx: number; accountKey: string; field: ReturnType<typeof resolveHeader> }[] = []
-  grid.headers.forEach((h, i) => {
-    const r = resolveHeader(h)
-    if (r.kind === "name") nombreIdx = i
-    else if (r.kind === "nit") nitIdx = i
-    else if (r.kind === "field") fieldCols.push({ idx: i, accountKey: r.field.accountKey, field: r })
-  })
-
+  // Mapea cada columna del archivo a su definición.
+  const cols: (ImportColumn | null)[] = grid.headers.map((h) => resolveHeader(h))
+  const nombreIdx = cols.findIndex((c) => c?.target.kind === "matchName")
+  const nitIdx = cols.findIndex((c) => c?.target.kind === "matchNit")
   if (nombreIdx === -1 && nitIdx === -1) {
-    return badRequest("La plantilla debe incluir una columna 'Razón Social' o 'NIT' para identificar al cliente.")
-  }
-  if (fieldCols.length === 0) {
-    return badRequest("No se reconoció ninguna columna de datos. Usa la plantilla descargable.")
+    return badRequest("La plantilla debe incluir 'Nombre Empresa' o 'NIT' para identificar al cliente.")
   }
 
   try {
@@ -117,18 +97,19 @@ export async function POST(req: NextRequest) {
     const res: Resultado = {
       clientesActualizados: 0,
       camposAplicados: 0,
+      contactos: 0,
+      ejecutivos: 0,
+      contratos: 0,
       filasSinCambios: 0,
       noEncontrados: [],
       ambiguos: [],
-      detalle: [],
     }
 
     for (const row of grid.rows) {
       const nombre = (nombreIdx >= 0 ? row[nombreIdx] : "")?.trim() ?? ""
       const nit = (nitIdx >= 0 ? row[nitIdx] : "")?.trim() ?? ""
-      if (!nombre && !nit) continue // fila en blanco
+      if (!nombre && !nit) continue
 
-      // Resolver cliente: primero por NIT (más preciso), luego por nombre exacto.
       let cuenta = nit ? byNit.get(nit) : undefined
       if (!cuenta && nombre) {
         const matches = byName.get(normHeader(nombre)) ?? []
@@ -143,26 +124,104 @@ export async function POST(req: NextRequest) {
         continue
       }
 
-      // Recolectar los campos con valor válido (no vacío, no placeholder).
-      const data: Record<string, unknown> = {}
-      for (const col of fieldCols) {
-        if (col.field.kind !== "field") continue
-        const raw = row[col.idx] ?? ""
-        if (esPlaceholder(raw)) continue
-        const value = coerceValue(col.field.field, raw)
-        if (value === undefined) continue
-        data[col.accountKey] = value
+      // Bucket de valores por destino.
+      const accountData: Record<string, unknown> = {}
+      const contactData: Record<string, unknown> = {}
+      const productData: Record<string, unknown> = {}
+      let ejecutivo: string | undefined
+
+      cols.forEach((col, i) => {
+        if (!col) return
+        const t = col.target
+        if (t.kind === "matchName" || t.kind === "matchNit" || t.kind === "ignore" || t.kind === "computed") return
+        const raw = row[i] ?? ""
+        if (esPlaceholder(raw)) return
+        const value = coerceCol(col.tipo, raw)
+        if (value === undefined) return
+        if (t.kind === "account") accountData[t.key] = value
+        else if (t.kind === "contact") contactData[t.key] = value
+        else if (t.kind === "product") productData[t.key] = value
+        else if (t.kind === "relationship") ejecutivo = String(value)
+      })
+
+      let campos = 0
+
+      // 1) Cliente
+      if (Object.keys(accountData).length) {
+        await prisma.account.update({ where: { id: cuenta.id }, data: accountData })
+        campos += Object.keys(accountData).length
       }
 
-      const n = Object.keys(data).length
-      if (n === 0) {
-        res.filasSinCambios++
-        continue
+      // 2) Contacto Principal (upsert)
+      if (Object.keys(contactData).length) {
+        const existing = await prisma.contact.findFirst({
+          where: { accountId: cuenta.id, cr_bex_tipocontacto: "Principal" },
+          select: { id: true },
+        })
+        if (existing) {
+          await prisma.contact.update({ where: { id: existing.id }, data: contactData })
+        } else {
+          await prisma.contact.create({
+            data: {
+              accountId: cuenta.id,
+              cr_bex_tipocontacto: "Principal",
+              fullname: (contactData.fullname as string) ?? "",
+              emailaddress1: (contactData.emailaddress1 as string) ?? "",
+              jobtitle: (contactData.jobtitle as string) ?? null,
+              telephone1: (contactData.telephone1 as string) ?? null,
+            },
+          })
+        }
+        res.contactos++
+        campos += Object.keys(contactData).length
       }
-      await prisma.account.update({ where: { id: cuenta.id }, data })
-      res.clientesActualizados++
-      res.camposAplicados += n
-      res.detalle.push({ cliente: cuenta.name, campos: n })
+
+      // 3) Ejecutivo de cuenta (Relacionamiento, upsert por rol)
+      if (ejecutivo) {
+        const existing = await prisma.bextRelationship.findFirst({
+          where: { accountId: cuenta.id, cr_bex_rolbext: "Ejecutivo Comercial" },
+          select: { id: true },
+        })
+        if (existing) {
+          await prisma.bextRelationship.update({ where: { id: existing.id }, data: { cr_bex_nombrepersona: ejecutivo } })
+        } else {
+          await prisma.bextRelationship.create({
+            data: { accountId: cuenta.id, cr_bex_rolbext: "Ejecutivo Comercial", cr_bex_nombrepersona: ejecutivo },
+          })
+        }
+        res.ejecutivos++
+        campos += 1
+      }
+
+      // 4) Producto/Servicio contratado (upsert; match por línea si viene)
+      if (Object.keys(productData).length) {
+        const linea = productData.cr_bex_lineanegocio as string | undefined
+        const existing = await prisma.productService.findFirst({
+          where: { accountId: cuenta.id, ...(linea ? { cr_bex_lineanegocio: linea } : {}) },
+          orderBy: { createdon: "desc" },
+          select: { id: true },
+        })
+        if (existing) {
+          await prisma.productService.update({ where: { id: existing.id }, data: productData })
+        } else {
+          await prisma.productService.create({
+            data: {
+              accountId: cuenta.id,
+              title: cuenta.name,
+              cr_bex_productoservicio: (productData.cr_bex_productoservicio as string) ?? "(sin especificar)",
+              ...productData,
+            },
+          })
+        }
+        res.contratos++
+        campos += Object.keys(productData).length
+      }
+
+      if (campos === 0) res.filasSinCambios++
+      else {
+        res.clientesActualizados++
+        res.camposAplicados += campos
+      }
     }
 
     return NextResponse.json({ ok: true, ...res })

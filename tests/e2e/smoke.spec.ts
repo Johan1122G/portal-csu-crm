@@ -60,6 +60,28 @@ test("Plan / Tareas: crear una tarea manual la muestra en la lista", async ({ pa
   await expectNoAppError(page)
 })
 
+test("Import masivo: sube un archivo y actualiza cliente + contacto + contrato", async ({ page }) => {
+  await page.goto("/clientes/importar")
+  await expect(page.getByText("Descarga la plantilla")).toBeVisible({ timeout: 45_000 })
+
+  // CSV con datos de varios destinos para el cliente sembrado ROJO.
+  const csv = [
+    "Nombre Empresa,Sector,Contacto Principal,Correo,Ejecutivo Cuenta,Tipo de solución contratado,Fecha Fin",
+    "Cliente Rojo (test),Gobierno,Ana Test,ana@test.com,Juan BEXT,Servicios,2027-01-01",
+  ].join("\n")
+
+  await page.setInputFiles('input[type="file"]', {
+    name: "carga.csv",
+    mimeType: "text/csv",
+    buffer: Buffer.from(csv, "utf8"),
+  })
+  await page.getByRole("button", { name: /Importar a todos los clientes/ }).click()
+
+  await expect(page.getByText(/cliente\(s\) actualizado\(s\)/)).toBeVisible({ timeout: 20_000 })
+  await expect(page.getByText(/contacto\(s\)/)).toBeVisible()
+  await expectNoAppError(page)
+})
+
 test("Digest: carga y ubica al cliente en riesgo", async ({ page }) => {
   await page.goto("/digest")
   await expect(page.getByText("En riesgo (rojo)")).toBeVisible()

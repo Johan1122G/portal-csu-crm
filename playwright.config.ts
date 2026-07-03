@@ -10,8 +10,9 @@ const baseURL = `http://localhost:${PORT}`
 
 export default defineConfig({
   testDir: "tests/e2e",
-  timeout: 30_000,
-  expect: { timeout: 10_000 },
+  // Timeout amplio: en dev, la 1ª visita a cada ruta compila en frío (puede tardar).
+  timeout: 90_000,
+  expect: { timeout: 15_000 },
   fullyParallel: false,
   workers: 1,
   retries: 0,

@@ -45,3 +45,6 @@ next-env.d.ts
 
 # Clon anidado accidental (no versionar)
 /portal-csu-crm/
+
+# Archivos xlsx sueltos en la raíz (muestras, no forman parte de la app)
+/*.xlsx

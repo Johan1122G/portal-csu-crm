@@ -36,6 +36,10 @@
     ".next-build/types/**/*.ts"
   ],
   "exclude": [
-    "node_modules"
+    "node_modules",
+    "portal-csu-crm",
+    ".next",
+    ".next-test",
+    ".next-build"
   ]
 }

@@ -21,15 +21,17 @@ import {
   MessageBarTitle,
 } from "@fluentui/react-components"
 import { ArrowDownloadRegular, ArrowUploadRegular } from "@fluentui/react-icons"
-import { CLIENT_IMPORT_FIELDS, FIELD_OPCIONES, type Equipo } from "@/lib/import/clientFields"
+import { IMPORT_COLUMNS } from "@/lib/import/bulk"
 
 type Resultado = {
   clientesActualizados: number
   camposAplicados: number
+  contactos: number
+  ejecutivos: number
+  contratos: number
   filasSinCambios: number
   noEncontrados: string[]
   ambiguos: string[]
-  detalle: { cliente: string; campos: number }[]
 }
 
 const useStyles = makeStyles({
@@ -41,15 +43,12 @@ const useStyles = makeStyles({
   fileRow: { display: "flex", gap: tokens.spacingHorizontalM, alignItems: "center", flexWrap: "wrap" },
   fileName: { color: tokens.colorNeutralForeground3 },
   card: { padding: tokens.spacingHorizontalL, display: "flex", flexDirection: "column", gap: tokens.spacingVerticalM },
-  tableWrap: { maxHeight: "360px", overflowY: "auto" },
+  tableWrap: { maxHeight: "420px", overflowY: "auto" },
   chips: { display: "flex", gap: tokens.spacingHorizontalS, flexWrap: "wrap", marginTop: tokens.spacingVerticalS },
 })
 
-const equipoColor: Record<Equipo, "brand" | "success" | "informative"> = {
-  Comercial: "brand",
-  Técnico: "success",
-  Ambos: "informative",
-}
+const destinoColor = (d: string): "brand" | "success" | "warning" | "informative" | "subtle" =>
+  d.startsWith("Contacto") ? "success" : d.startsWith("Ejecutivo") ? "warning" : d.startsWith("Producto") ? "informative" : d.startsWith("Cliente") ? "brand" : "subtle"
 
 export function BulkImportView() {
   const styles = useStyles()
@@ -90,8 +89,8 @@ export function BulkImportView() {
             <Subtitle2>Descarga la plantilla</Subtitle2>
           </div>
           <Body1>
-            Un <b>único Excel</b> con <b>una fila por cliente</b> (todos los clientes ya listados) y una columna
-            por cada campo, con su <b>valor actual</b>. Cada encabezado tiene una nota con el formato y un ejemplo.
+            Un <b>único Excel</b> con <b>una fila por cliente</b> (todos ya listados) y una columna por campo, con
+            su <b>valor actual</b>. Las columnas acotadas traen <b>lista desplegable</b>.
           </Body1>
           <Button appearance="primary" icon={<ArrowDownloadRegular />} as="a" href={`/api/clientes/importar/plantilla`}>
             Descargar plantilla .xlsx
@@ -104,13 +103,13 @@ export function BulkImportView() {
             <Subtitle2>Diligencia los datos</Subtitle2>
           </div>
           <Body1>
-            No cambies la columna <b>Razón Social</b>: es la que identifica al cliente (debe quedar con el
-            <b> nombre exacto</b> que ya tiene en el portal). Edita las columnas de datos. Reglas:
+            No cambies <b>Nombre Empresa</b> (identifica al cliente con el nombre exacto del portal). Edita las
+            demás columnas. Reglas:
           </Body1>
           <ul style={{ margin: 0, paddingLeft: 18, fontSize: tokens.fontSizeBase200 }}>
-            <li>Fechas en formato <b>YYYY-MM-DD</b>; Sí/No para preguntas; números sin texto.</li>
+            <li>Fechas <b>YYYY-MM-DD</b>; Sí/No para preguntas; números sin texto (el valor puede llevar $ o miles).</li>
             <li>Una celda en blanco <b>no</b> borra el dato existente.</li>
-            <li>Si un nombre no coincide con ningún cliente, esa fila se <b>omite</b> y se reporta.</li>
+            <li>Nombre no encontrado → la fila se <b>omite</b> y se reporta.</li>
           </ul>
         </Card>
 
@@ -131,9 +130,7 @@ export function BulkImportView() {
                 setError(null)
               }}
             />
-            <Button appearance="secondary" onClick={() => fileRef.current?.click()}>
-              Elegir archivo
-            </Button>
+            <Button appearance="secondary" onClick={() => fileRef.current?.click()}>Elegir archivo</Button>
             {file && <span className={styles.fileName}>{file.name}</span>}
           </div>
           <Button appearance="primary" icon={<ArrowUploadRegular />} onClick={doImport} disabled={!file || importing}>
@@ -159,6 +156,11 @@ export function BulkImportView() {
                 ? `${result.clientesActualizados} cliente(s) actualizado(s) · ${result.camposAplicados} campo(s)`
                 : "No se aplicaron cambios"}
             </MessageBarTitle>
+            {(result.contactos > 0 || result.ejecutivos > 0 || result.contratos > 0) && (
+              <>
+                {result.contactos} contacto(s), {result.ejecutivos} ejecutivo(s), {result.contratos} contrato(s).{" "}
+              </>
+            )}
             {result.filasSinCambios > 0 && <>{result.filasSinCambios} fila(s) sin valores nuevos. </>}
             {result.noEncontrados.length > 0 && (
               <div className={styles.chips}>
@@ -181,32 +183,28 @@ export function BulkImportView() {
       )}
 
       <Card className={styles.card}>
-        <Subtitle2>Qué llena cada equipo</Subtitle2>
+        <Subtitle2>Columnas del archivo y a dónde va cada dato</Subtitle2>
         <div className={styles.tableWrap}>
           <Table size="small">
             <TableHeader>
               <TableRow>
-                <TableHeaderCell>Sección</TableHeaderCell>
                 <TableHeaderCell>Columna</TableHeaderCell>
-                <TableHeaderCell>Equipo</TableHeaderCell>
+                <TableHeaderCell>Sección</TableHeaderCell>
+                <TableHeaderCell>Destino</TableHeaderCell>
                 <TableHeaderCell>Formato / opciones</TableHeaderCell>
                 <TableHeaderCell>Ejemplo</TableHeaderCell>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {CLIENT_IMPORT_FIELDS.map((f) => (
-                <TableRow key={f.campo}>
-                  <TableCell>{f.seccion}</TableCell>
-                  <TableCell>{f.etiqueta}</TableCell>
+              {IMPORT_COLUMNS.map((c) => (
+                <TableRow key={c.header}>
+                  <TableCell><Text weight="semibold">{c.header}</Text></TableCell>
+                  <TableCell><Text size={200}>{c.seccion}</Text></TableCell>
                   <TableCell>
-                    <Badge appearance="tint" color={equipoColor[f.equipo]}>{f.equipo}</Badge>
+                    <Badge appearance="tint" color={destinoColor(c.destino)}>{c.destino}</Badge>
                   </TableCell>
-                  <TableCell>
-                    <Text size={200}>{FIELD_OPCIONES[f.campo] ?? "Texto libre"}</Text>
-                  </TableCell>
-                  <TableCell>
-                    <Text size={200} italic>{f.ejemplo}</Text>
-                  </TableCell>
+                  <TableCell><Text size={200}>{c.opciones ? c.opciones.join(" · ") : c.tipo}</Text></TableCell>
+                  <TableCell><Text size={200} italic>{c.ejemplo}</Text></TableCell>
                 </TableRow>
               ))}
             </TableBody>

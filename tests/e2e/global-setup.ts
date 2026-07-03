@@ -23,11 +23,25 @@ export default async function globalSetup() {
   const browser = await chromium.launch()
   const context = await browser.newContext({ baseURL })
 
-  const csrf = (await (await context.request.get("/api/auth/csrf")).json()) as { csrfToken: string }
+  // El server de test compila en frío la 1ª vez; reintenta hasta que /api/auth/csrf
+  // responda (timeout amplio por request).
+  let csrfToken = ""
+  for (let intento = 1; intento <= 8 && !csrfToken; intento++) {
+    try {
+      const r = await context.request.get("/api/auth/csrf", { timeout: 60_000 })
+      if (r.ok()) csrfToken = ((await r.json()) as { csrfToken: string }).csrfToken
+    } catch {
+      /* server aún compilando; reintenta */
+    }
+    if (!csrfToken) await new Promise((res) => setTimeout(res, 2000))
+  }
+  if (!csrfToken) throw new Error("El server de test no respondió /api/auth/csrf a tiempo.")
+
   await context.request.post("/api/auth/callback/dev-bypass", {
-    form: { csrfToken: csrf.csrfToken, callbackUrl: `${baseURL}/` },
+    form: { csrfToken, callbackUrl: `${baseURL}/` },
+    timeout: 60_000,
   })
-  const session = (await (await context.request.get("/api/auth/session")).json()) as {
+  const session = (await (await context.request.get("/api/auth/session", { timeout: 60_000 })).json()) as {
     user?: { email?: string }
   }
   if (!session?.user) throw new Error("El login dev-bypass no estableció sesión en el setup E2E.")

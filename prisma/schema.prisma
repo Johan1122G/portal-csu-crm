@@ -50,6 +50,12 @@ model Account {
   cr_bex_acompanamientoprioritario Boolean @default(false)
   cr_bex_comentarioscs             String?
 
+  // Métricas manuales reportadas por el CSM (conviven con las calculadas de GLPI)
+  cr_bex_nps               Int? // NPS reportado
+  cr_bex_csatmanual        Float? // CSAT reportado (manual)
+  cr_bex_slacumplimiento   Int? // % cumplimiento SLA reportado (manual)
+  cr_bex_ultimainteraccion DateTime? // última interacción reportada (manual)
+
   // Sección 6 — Observaciones Generales
   description String? // D365: description
 
@@ -64,8 +70,9 @@ model Account {
   insightThreads InsightThread[]
   insightFindings InsightFinding[]
   teamsMeetings  TeamsMeetingCache[]
-  tasks         Task[]
-  playbookRuns  PlaybookRun[]
+  tasks            Task[]
+  playbookRuns     PlaybookRun[]
+  ticketEmbeddings TicketEmbedding[]
   products      ProductService[]
   activities    CSActivity[]
   opportunities OpportunityRecommendation[]
@@ -124,6 +131,8 @@ model ProductService {
   statecode               String  @default("Activo") // D365: statecode — Activo | Suspendido | Cancelado | En renovación
   activeon                DateTime? // D365: activeon (fecha inicio)
   expireson               DateTime? // D365: expireson (fecha renovación)
+  cr_bex_valorcontrato    Float? // valor del contrato
+  cr_bex_tipofacturacion  String? // Mensual | Anual | Único pago | ...
   cr_bex_responsablebext  String?
   cr_bex_observaciones    String?
 
@@ -223,6 +232,26 @@ model GlpiTicketFact {
   @@index([accountId])
   @@index([category])
   @@map("glpi_ticket_facts")
+}
+
+// ─── EMBEDDINGS DE TICKETS (búsqueda semántica) ──────────────────────────────────
+// Vector del asunto+descripción de cada ticket, guardado como JSON. La similitud
+// (coseno) se calcula en el servidor al buscar. textHash evita re-embeddear si el
+// texto del ticket no cambió desde la última indexación.
+model TicketEmbedding {
+  id           String  @id @default(cuid())
+  accountId    String
+  account      Account @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  glpiTicketId Int
+  vector       String // JSON: number[]
+  dim          Int
+  model        String // deployment de embeddings usado
+  textHash     String // hash del texto indexado
+  createdon    DateTime @default(now())
+
+  @@unique([accountId, glpiTicketId])
+  @@index([accountId])
+  @@map("ticket_embeddings")
 }
 
 // ─── CATÁLOGO DE SERVICIOS BEXT (lo que BEXT OFRECE, por unidad) ──────────────────

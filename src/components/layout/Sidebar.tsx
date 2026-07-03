@@ -18,6 +18,12 @@ import {
   Alert24Filled,
   DataTrending24Regular,
   DataTrending24Filled,
+  DataHistogram24Regular,
+  DataHistogram24Filled,
+  SearchSquare24Regular,
+  SearchSquare24Filled,
+  ArrowTrendingDown24Regular,
+  ArrowTrendingDown24Filled,
   Settings24Regular,
   Settings24Filled,
 } from "@fluentui/react-icons"
@@ -61,6 +67,24 @@ const NAV: NavEntry[] = [
     label: "Benchmark",
     Icon: DataTrending24Regular,
     IconActive: DataTrending24Filled,
+  },
+  {
+    href: "/capacidad",
+    label: "Proyección",
+    Icon: DataHistogram24Regular,
+    IconActive: DataHistogram24Filled,
+  },
+  {
+    href: "/buscar",
+    label: "Búsqueda IA",
+    Icon: SearchSquare24Regular,
+    IconActive: SearchSquare24Filled,
+  },
+  {
+    href: "/churn",
+    label: "Riesgo de fuga",
+    Icon: ArrowTrendingDown24Regular,
+    IconActive: ArrowTrendingDown24Filled,
   },
   { href: "/configuracion", label: "Configuración", Icon: Settings24Regular, IconActive: Settings24Filled },
 ]
