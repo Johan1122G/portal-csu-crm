@@ -116,6 +116,17 @@ export async function resetAndSeed() {
           },
         ],
       },
+      deliverables: {
+        create: [
+          {
+            nombre: "Informe de gestión de mesa",
+            frecuencia: "Mensual",
+            responsable: "Ana CSM",
+            proximaEntrega: subDays(new Date(), 3), // vencido hace 3 días
+            notificarDiasAntes: 5,
+          },
+        ],
+      },
     },
   })
   // Tendencia al alza: meses -5..-3 = 1 c/u; meses -2..0 = 3,3,4. CSAT bajo. Horas para burn-rate.

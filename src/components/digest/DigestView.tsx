@@ -25,12 +25,13 @@ import {
 } from "@fluentui/react-icons"
 
 type DigestRow = { id: string; name: string; estrategico: boolean; score: number | null; color: "verde" | "amarillo" | "rojo" | "gris"; detalle: string }
+type DigestEntregable = { accountId: string; cliente: string; nombre: string; detalle: string; vencido: boolean }
 type Digest = {
   generatedAt: string
   totalClientes: number
   sincronizados: number
   sinDatosSalud: number
-  buckets: { enRojo: DigestRow[]; renovaciones: DigestRow[]; bolsas: DigestRow[]; sinContacto: DigestRow[] }
+  buckets: { enRojo: DigestRow[]; renovaciones: DigestRow[]; bolsas: DigestRow[]; sinContacto: DigestRow[]; entregables: DigestEntregable[] }
   intro: string | null
 }
 
@@ -102,7 +103,8 @@ export function DigestView() {
   if (!data) return null
 
   const b = data.buckets
-  const totalAlertas = b.enRojo.length + b.renovaciones.length + b.bolsas.length + b.sinContacto.length
+  const totalAlertas =
+    b.enRojo.length + b.renovaciones.length + b.bolsas.length + b.sinContacto.length + b.entregables.length
 
   const Bucket = ({
     titulo,
@@ -180,6 +182,28 @@ export function DigestView() {
         <Bucket titulo="Renovaciones ≤30 días" icon={<CalendarClockRegular />} rows={b.renovaciones} color="warning" vacio="Sin renovaciones inminentes." />
         <Bucket titulo="Bolsas por agotarse (≤6 sem)" icon={<ClockRegular />} rows={b.bolsas} color="warning" vacio="Ninguna bolsa por agotarse." />
         <Bucket titulo="Sin contacto (>60 días)" icon={<PersonQuestionMarkRegular />} rows={b.sinContacto} color="informative" vacio="Todos con contacto reciente." />
+
+        {/* Entregables (valor agregado) — forma distinta a los buckets de cliente. */}
+        <Card className={styles.card}>
+          <div className={styles.cardHead}>
+            <CalendarClockRegular />
+            <Subtitle2>Entregables por entregar</Subtitle2>
+            <Badge className={styles.count} appearance="tint" color={b.entregables.length ? "danger" : "subtle"}>
+              {b.entregables.length}
+            </Badge>
+          </div>
+          {b.entregables.length === 0 ? (
+            <Text className={styles.empty}>Sin entregables vencidos o próximos.</Text>
+          ) : (
+            b.entregables.map((e, i) => (
+              <div key={e.accountId + e.nombre + i} className={styles.row}>
+                <Badge appearance="tint" color={e.vencido ? "danger" : "warning"}>{e.vencido ? "vencido" : "próximo"}</Badge>
+                <Link className={styles.link} href={`/clientes/${e.accountId}`}>{e.cliente}</Link>
+                <span className={styles.detalle}>{e.nombre} · {e.detalle}</span>
+              </div>
+            ))
+          )}
+        </Card>
       </div>
     </>
   )

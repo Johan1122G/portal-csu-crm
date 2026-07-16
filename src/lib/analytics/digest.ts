@@ -5,6 +5,7 @@
 // Opcionalmente añade una intro narrativa con IA (si Azure OpenAI está configurado).
 
 import { computePortfolio, type PortfolioRow } from "@/lib/analytics/portfolio"
+import { computeDeliverables } from "@/lib/deliverables/overview"
 import { generateDigestIntro } from "@/lib/analytics/ai"
 
 // Umbrales (ajustables): qué se considera "urgente" en cada cubo.
@@ -21,6 +22,8 @@ export type DigestRow = {
   detalle: string
 }
 
+export type DigestEntregable = { accountId: string; cliente: string; nombre: string; detalle: string; vencido: boolean }
+
 export type Digest = {
   generatedAt: string
   totalClientes: number
@@ -31,6 +34,7 @@ export type Digest = {
     renovaciones: DigestRow[]
     bolsas: DigestRow[]
     sinContacto: DigestRow[]
+    entregables: DigestEntregable[]
   }
   intro: string | null
 }
@@ -77,7 +81,26 @@ export async function computeDigest(opts?: { conIntro?: boolean }): Promise<Dige
     .sort((a, b) => (b.diasSinContacto ?? 0) - (a.diasSinContacto ?? 0))
     .map((r) => ({ ...base(r), detalle: `${r.diasSinContacto} días sin contacto` }))
 
-  const buckets = { enRojo, renovaciones, bolsas, sinContacto }
+  // Entregables (valor agregado) vencidos o próximos a vencer.
+  const deliverables = await computeDeliverables()
+  const entregables: DigestEntregable[] = deliverables.rows
+    .filter((d) => d.estado === "vencido" || d.estado === "proximo")
+    .map((d) => ({
+      accountId: d.accountId,
+      cliente: d.cliente,
+      nombre: d.nombre,
+      vencido: d.estado === "vencido",
+      detalle:
+        d.dias == null
+          ? d.nombre
+          : d.dias < 0
+            ? `vencido hace ${-d.dias}d`
+            : d.dias === 0
+              ? "vence hoy"
+              : `vence en ${d.dias}d`,
+    }))
+
+  const buckets = { enRojo, renovaciones, bolsas, sinContacto, entregables }
 
   let intro: string | null = null
   if (opts?.conIntro) {
@@ -87,6 +110,7 @@ export async function computeDigest(opts?: { conIntro?: boolean }): Promise<Dige
       renovaciones: renovaciones.length,
       bolsas: bolsas.length,
       sinContacto: sinContacto.length,
+      entregablesPendientes: entregables.length,
       topRiesgos: enRojo.slice(0, 5).map((r) => `${r.name}: ${r.detalle}`),
     })
   }

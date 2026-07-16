@@ -119,6 +119,29 @@ export const ORIGENES_OPORTUNIDAD = [
   "Otro",
 ] as const
 
+// Valor agregado / entregables recurrentes.
+export const TIPOS_ENTREGABLE = [
+  "Informe de gestión de mesa",
+  "Informe de vulnerabilidades",
+  "Informe MIM",
+  "Informe AD",
+  "Informe de disponibilidad",
+  "Reunión de seguimiento",
+  "QBR / revisión ejecutiva",
+  "Plan de trabajo",
+] as const
+
+export const FRECUENCIAS_ENTREGABLE = [
+  "Semanal",
+  "Quincenal",
+  "Mensual",
+  "Bimensual",
+  "Trimestral",
+  "Semestral",
+  "Anual",
+  "Única vez",
+] as const
+
 // ─── Catálogos editables ───────────────────────────────────────────────────────
 // Los valores arriba son los DEFAULTS de siembra. En runtime las listas se cargan
 // desde la tabla `catalogs` (administrable por el CSM). La key identifica cada lista.
@@ -142,6 +165,8 @@ export const CATALOG_DEFAULTS: Record<string, readonly string[]> = {
   LINEAS_NEGOCIO,
   TIPOS_CONTACTO,
   ORIGENES_OPORTUNIDAD,
+  TIPOS_ENTREGABLE,
+  FRECUENCIAS_ENTREGABLE,
 }
 
 // Etiqueta legible de cada catálogo para la página de administración.
@@ -165,6 +190,8 @@ export const CATALOG_LABELS: Record<string, string> = {
   LINEAS_NEGOCIO: "Líneas de negocio",
   TIPOS_CONTACTO: "Tipos de contacto",
   ORIGENES_OPORTUNIDAD: "Orígenes de oportunidad",
+  TIPOS_ENTREGABLE: "Tipos de entregable (valor agregado)",
+  FRECUENCIAS_ENTREGABLE: "Frecuencias de entregable",
 }
 
 export type CatalogKey = keyof typeof CATALOG_DEFAULTS

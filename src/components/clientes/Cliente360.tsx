@@ -33,6 +33,7 @@ import { TicketsTab } from "@/components/clientes/tabs/TicketsTab"
 import { ReunionesTab } from "@/components/clientes/tabs/ReunionesTab"
 import { InsightsTab } from "@/components/clientes/tabs/InsightsTab"
 import { TareasTab } from "@/components/clientes/tabs/TareasTab"
+import { ValorAgregadoTab } from "@/components/clientes/tabs/ValorAgregadoTab"
 import type { AccountWithRelations } from "@/types"
 
 const useStyles = makeStyles({
@@ -72,6 +73,7 @@ type TabKey =
   | "tickets"
   | "insights"
   | "plan"
+  | "valoragregado"
   | "reuniones"
 
 export function Cliente360({ cliente }: { cliente: AccountWithRelations }) {
@@ -131,6 +133,7 @@ export function Cliente360({ cliente }: { cliente: AccountWithRelations }) {
         <Tab value="tickets">Tickets (GLPI)</Tab>
         <Tab value="insights">Insights (IA)</Tab>
         <Tab value="plan">Plan / Tareas</Tab>
+        <Tab value="valoragregado">Valor agregado</Tab>
         <Tab value="reuniones">Reuniones (Teams)</Tab>
       </TabList>
 
@@ -246,6 +249,9 @@ export function Cliente360({ cliente }: { cliente: AccountWithRelations }) {
 
       {/* Plan / Tareas (playbooks + acciones sugeridas) */}
       {tab === "plan" && <TareasTab accountId={cliente.id} />}
+
+      {/* Valor agregado (entregables recurrentes) */}
+      {tab === "valoragregado" && <ValorAgregadoTab accountId={cliente.id} />}
 
       {/* Reuniones (Teams) */}
       {tab === "reuniones" && <ReunionesTab accountId={cliente.id} />}

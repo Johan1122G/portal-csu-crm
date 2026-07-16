@@ -6,5 +6,5 @@ export { auth as middleware } from "@/lib/auth"
 // (Logic App) los invoque con su secreto — ambos endpoints exigen x-sync-secret o
 // sesión, no son públicos.
 export const config = {
-  matcher: ["/((?!api/auth|api/analitica/sync|api/analitica/digest|_next/static|_next/image|favicon.ico|login).*)"],
+  matcher: ["/((?!api/auth|api/analitica/sync|api/analitica/digest|api/valor-agregado|_next/static|_next/image|favicon.ico|login).*)"],
 }

@@ -34,6 +34,14 @@ test("Riesgo de fuga: rankea clientes con factores", async ({ page }) => {
   await expectNoAppError(page)
 })
 
+test("Valor agregado: lista entregables globales (vencido sembrado)", async ({ page }) => {
+  await page.goto("/valor-agregado")
+  await expect(page.getByText("Vencidos")).toBeVisible({ timeout: 45_000 })
+  await expect(page.getByText("Informe de gestión de mesa")).toBeVisible()
+  await expect(page.getByRole("link", { name: "Cliente Rojo (test)" }).first()).toBeVisible()
+  await expectNoAppError(page)
+})
+
 test("Proyección de capacidad: muestra series y bolsas", async ({ page }) => {
   await page.goto("/capacidad")
   await expect(page.getByText("Volumen de tickets / mes")).toBeVisible({ timeout: 45_000 })

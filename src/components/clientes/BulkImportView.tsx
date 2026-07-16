@@ -29,6 +29,7 @@ type Resultado = {
   contactos: number
   ejecutivos: number
   contratos: number
+  entregables: number
   filasSinCambios: number
   noEncontrados: string[]
   ambiguos: string[]
@@ -89,8 +90,9 @@ export function BulkImportView() {
             <Subtitle2>Descarga la plantilla</Subtitle2>
           </div>
           <Body1>
-            Un <b>único Excel</b> con <b>una fila por cliente</b> (todos ya listados) y una columna por campo, con
-            su <b>valor actual</b>. Las columnas acotadas traen <b>lista desplegable</b>.
+            Un <b>único Excel</b> con dos hojas: <b>Clientes</b> (una fila por cliente, con su valor actual) y{" "}
+            <b>Entregables</b> (una fila por entregable de valor agregado). Las columnas acotadas traen{" "}
+            <b>lista desplegable</b>.
           </Body1>
           <Button appearance="primary" icon={<ArrowDownloadRegular />} as="a" href={`/api/clientes/importar/plantilla`}>
             Descargar plantilla .xlsx
@@ -156,9 +158,10 @@ export function BulkImportView() {
                 ? `${result.clientesActualizados} cliente(s) actualizado(s) · ${result.camposAplicados} campo(s)`
                 : "No se aplicaron cambios"}
             </MessageBarTitle>
-            {(result.contactos > 0 || result.ejecutivos > 0 || result.contratos > 0) && (
+            {(result.contactos > 0 || result.ejecutivos > 0 || result.contratos > 0 || result.entregables > 0) && (
               <>
-                {result.contactos} contacto(s), {result.ejecutivos} ejecutivo(s), {result.contratos} contrato(s).{" "}
+                {result.contactos} contacto(s), {result.ejecutivos} ejecutivo(s), {result.contratos} contrato(s),{" "}
+                {result.entregables} entregable(s).{" "}
               </>
             )}
             {result.filasSinCambios > 0 && <>{result.filasSinCambios} fila(s) sin valores nuevos. </>}

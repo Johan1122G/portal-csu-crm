@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import ExcelJS from "exceljs"
 import { prisma } from "@/lib/prisma"
 import { requireSession, serverError } from "@/lib/api"
-import { IMPORT_COLUMNS, formatForTemplate, type ImportColumn } from "@/lib/import/bulk"
+import { IMPORT_COLUMNS, formatForTemplate, ENTREGABLE_COLUMNS, ENTREGABLE_SHEET, type ImportColumn } from "@/lib/import/bulk"
 
 export const dynamic = "force-dynamic"
 
@@ -102,6 +102,42 @@ export async function GET(_req: NextRequest) {
           formulae,
           showErrorMessage: false, // permite dejar valores previos aunque no estén en la lista
         }
+      }
+    })
+
+    // ── Hoja 2: Entregables (valor agregado) ──────────────────────────────────
+    const ws2 = wb.addWorksheet(ENTREGABLE_SHEET, { views: [{ state: "frozen", ySplit: 1 }] })
+    ws2.columns = ENTREGABLE_COLUMNS.map((c) => ({ header: c.header, key: c.key, width: c.key === "nombre" ? 30 : 20 }))
+    const h2 = ws2.getRow(1)
+    h2.font = { bold: true }
+    ENTREGABLE_COLUMNS.forEach((c, i) => {
+      const partes = [c.opciones ? `Opciones: ${c.opciones.join(" · ")}` : `Formato: ${c.tipo}`, `Ejemplo: ${c.ejemplo}`]
+      h2.getCell(i + 1).note = partes.join("\n")
+    })
+
+    const entregables = await prisma.deliverable.findMany({
+      include: { account: { select: { name: true, accountnumber: true } } },
+      orderBy: [{ account: { name: "asc" } }, { nombre: "asc" }],
+    })
+    for (const d of entregables) {
+      ws2.addRow({
+        cliente: d.account.name,
+        nit: d.account.accountnumber,
+        nombre: d.nombre,
+        categoria: d.categoria ?? "",
+        frecuencia: d.frecuencia,
+        responsable: d.responsable ?? "",
+        proximaEntrega: d.proximaEntrega ? d.proximaEntrega.toISOString().slice(0, 10) : "",
+        notificarDiasAntes: String(d.notificarDiasAntes),
+      })
+    }
+    // Dropdowns en la hoja de entregables (buffer de filas para agregar nuevos).
+    const filas2 = Math.max(entregables.length + 1, 200)
+    ENTREGABLE_COLUMNS.forEach((c, i) => {
+      if (!c.opciones) return
+      const letter = ws2.getColumn(i + 1).letter
+      for (let r = 2; r <= filas2; r++) {
+        ws2.getCell(`${letter}${r}`).dataValidation = { type: "list", allowBlank: true, formulae: [`"${c.opciones.join(",")}"`], showErrorMessage: false }
       }
     })
 

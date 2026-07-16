@@ -73,6 +73,7 @@ model Account {
   tasks            Task[]
   playbookRuns     PlaybookRun[]
   ticketEmbeddings TicketEmbedding[]
+  deliverables     Deliverable[]
   products      ProductService[]
   activities    CSActivity[]
   opportunities OpportunityRecommendation[]
@@ -232,6 +233,49 @@ model GlpiTicketFact {
   @@index([accountId])
   @@index([category])
   @@map("glpi_ticket_facts")
+}
+
+// ─── ENTREGABLES / VALOR AGREGADO ─────────────────────────────────────────────────
+// Regla recurrente de un entregable por cliente (ej. "Informe de gestión de mesa"
+// mensual). proximaEntrega = próximo vencimiento; al marcar entregado se registra un
+// DeliverableLog y se avanza al siguiente período según la frecuencia.
+model Deliverable {
+  id        String  @id @default(cuid())
+  accountId String
+  account   Account @relation(fields: [accountId], references: [id], onDelete: Cascade)
+
+  nombre             String // "Informe de gestión de mesa"
+  categoria          String? // agrupación opcional (área/línea)
+  frecuencia         String // Mensual | Bimensual | Trimestral | Semestral | Anual | Única vez | ...
+  responsable        String? // CSM responsable
+  proximaEntrega     DateTime?
+  ultimaEntrega      DateTime?
+  notificarDiasAntes Int       @default(5)
+  activo             Boolean   @default(true)
+  notas              String?
+
+  createdon  DateTime @default(now())
+  modifiedon DateTime @updatedAt
+
+  logs DeliverableLog[]
+
+  @@index([accountId])
+  @@map("deliverables")
+}
+
+model DeliverableLog {
+  id            String      @id @default(cuid())
+  deliverableId String
+  deliverable   Deliverable @relation(fields: [deliverableId], references: [id], onDelete: Cascade)
+
+  entregadoOn  DateTime @default(now())
+  periodo      String? // etiqueta del período entregado (ej. "2026-07")
+  entregadoPor String?
+  nota         String?
+  createdon    DateTime @default(now())
+
+  @@index([deliverableId])
+  @@map("deliverable_logs")
 }
 
 // ─── EMBEDDINGS DE TICKETS (búsqueda semántica) ──────────────────────────────────

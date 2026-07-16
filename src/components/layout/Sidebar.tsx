@@ -24,6 +24,8 @@ import {
   SearchSquare24Filled,
   ArrowTrendingDown24Regular,
   ArrowTrendingDown24Filled,
+  Gift24Regular,
+  Gift24Filled,
   Settings24Regular,
   Settings24Filled,
 } from "@fluentui/react-icons"
@@ -85,6 +87,12 @@ const NAV: NavEntry[] = [
     label: "Riesgo de fuga",
     Icon: ArrowTrendingDown24Regular,
     IconActive: ArrowTrendingDown24Filled,
+  },
+  {
+    href: "/valor-agregado",
+    label: "Valor agregado",
+    Icon: Gift24Regular,
+    IconActive: Gift24Filled,
   },
   { href: "/configuracion", label: "Configuración", Icon: Settings24Regular, IconActive: Settings24Filled },
 ]

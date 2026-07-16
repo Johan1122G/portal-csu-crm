@@ -318,6 +318,7 @@ export async function generateDigestIntro(resumen: {
   renovaciones: number
   bolsas: number
   sinContacto: number
+  entregablesPendientes?: number
   topRiesgos: string[]
 }): Promise<string | null> {
   const cfg = tryReadConfig()

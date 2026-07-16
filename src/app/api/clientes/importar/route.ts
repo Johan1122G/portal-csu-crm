@@ -3,7 +3,16 @@ import ExcelJS from "exceljs"
 import Papa from "papaparse"
 import { prisma } from "@/lib/prisma"
 import { requireSession, badRequest, serverError } from "@/lib/api"
-import { IMPORT_COLUMNS, resolveHeader, coerceCol, esPlaceholder, normHeader, type ImportColumn } from "@/lib/import/bulk"
+import {
+  IMPORT_COLUMNS,
+  resolveHeader,
+  resolveEntregableHeader,
+  coerceCol,
+  esPlaceholder,
+  normHeader,
+  ENTREGABLE_SHEET,
+  type ImportColumn,
+} from "@/lib/import/bulk"
 
 export const dynamic = "force-dynamic"
 
@@ -22,17 +31,9 @@ function cellText(v: unknown): string {
   return String(v)
 }
 
-async function readGrid(file: File): Promise<{ headers: string[]; rows: string[][] }> {
-  if (file.name.toLowerCase().endsWith(".csv")) {
-    const parsed = Papa.parse<string[]>(await file.text(), { skipEmptyLines: true })
-    const all = parsed.data as string[][]
-    return { headers: (all[0] ?? []).map((h) => (h ?? "").toString()), rows: all.slice(1) }
-  }
-  const buf = Buffer.from(await file.arrayBuffer())
-  const wb = new ExcelJS.Workbook()
-  await wb.xlsx.load(buf as unknown as Parameters<typeof wb.xlsx.load>[0])
-  const ws = wb.worksheets[0]
-  if (!ws) return { headers: [], rows: [] }
+type Grid = { headers: string[]; rows: string[][] }
+
+function sheetToGrid(ws: ExcelJS.Worksheet): Grid {
   const headers = (ws.getRow(1).values as unknown[]).slice(1).map(cellText)
   const rows: string[][] = []
   ws.eachRow((row, n) => {
@@ -43,12 +44,31 @@ async function readGrid(file: File): Promise<{ headers: string[]; rows: string[]
   return { headers, rows }
 }
 
+// Lee el archivo: hoja de clientes (1ª) y, si es .xlsx, la hoja "Entregables".
+async function readGrids(file: File): Promise<{ clientes: Grid; entregables: Grid | null }> {
+  if (file.name.toLowerCase().endsWith(".csv")) {
+    const parsed = Papa.parse<string[]>(await file.text(), { skipEmptyLines: true })
+    const all = parsed.data as string[][]
+    return { clientes: { headers: (all[0] ?? []).map((h) => (h ?? "").toString()), rows: all.slice(1) }, entregables: null }
+  }
+  const buf = Buffer.from(await file.arrayBuffer())
+  const wb = new ExcelJS.Workbook()
+  await wb.xlsx.load(buf as unknown as Parameters<typeof wb.xlsx.load>[0])
+  const ws = wb.worksheets[0]
+  const wsEnt = wb.worksheets.find((s) => normHeader(s.name) === normHeader(ENTREGABLE_SHEET))
+  return {
+    clientes: ws ? sheetToGrid(ws) : { headers: [], rows: [] },
+    entregables: wsEnt ? sheetToGrid(wsEnt) : null,
+  }
+}
+
 type Resultado = {
   clientesActualizados: number
   camposAplicados: number
   contactos: number
   ejecutivos: number
   contratos: number
+  entregables: number
   filasSinCambios: number
   noEncontrados: string[]
   ambiguos: string[]
@@ -68,12 +88,13 @@ export async function POST(req: NextRequest) {
   }
   if (!file) return badRequest("Falta el archivo a importar.")
 
-  let grid: { headers: string[]; rows: string[][] }
+  let grids: { clientes: Grid; entregables: Grid | null }
   try {
-    grid = await readGrid(file)
+    grids = await readGrids(file)
   } catch {
     return badRequest("No se pudo leer el archivo. Usa la plantilla .xlsx (o un .csv con los mismos encabezados).")
   }
+  const grid = grids.clientes
 
   // Mapea cada columna del archivo a su definición.
   const cols: (ImportColumn | null)[] = grid.headers.map((h) => resolveHeader(h))
@@ -100,9 +121,24 @@ export async function POST(req: NextRequest) {
       contactos: 0,
       ejecutivos: 0,
       contratos: 0,
+      entregables: 0,
       filasSinCambios: 0,
       noEncontrados: [],
       ambiguos: [],
+    }
+
+    // Helper de match cliente por NIT o nombre exacto (reusado por ambas hojas).
+    const matchCuenta = (nombre: string, nit: string): (typeof cuentas)[number] | "ambiguo" | null => {
+      if (nit) {
+        const c = byNit.get(nit)
+        if (c) return c
+      }
+      if (nombre) {
+        const ms = byName.get(normHeader(nombre)) ?? []
+        if (ms.length === 1) return ms[0]
+        if (ms.length > 1) return "ambiguo"
+      }
+      return null
     }
 
     for (const row of grid.rows) {
@@ -221,6 +257,66 @@ export async function POST(req: NextRequest) {
       else {
         res.clientesActualizados++
         res.camposAplicados += campos
+      }
+    }
+
+    // ── Hoja 2: Entregables (upsert por cliente + nombre) ─────────────────────
+    if (grids.entregables && grids.entregables.rows.length) {
+      const ent = grids.entregables
+      const ecols = ent.headers.map((h) => resolveEntregableHeader(h))
+      const idxOf = (k: string) => ecols.findIndex((c) => c?.key === k)
+      const iCli = idxOf("cliente")
+      const iNit = idxOf("nit")
+      const iNom = idxOf("nombre")
+
+      if (iNom !== -1 && (iCli !== -1 || iNit !== -1)) {
+        for (const row of ent.rows) {
+          const nombreCli = (iCli >= 0 ? row[iCli] : "")?.trim() ?? ""
+          const nitCli = (iNit >= 0 ? row[iNit] : "")?.trim() ?? ""
+          const nombreEnt = (row[iNom] ?? "").trim()
+          if (!nombreEnt || (!nombreCli && !nitCli)) continue
+
+          const cuenta = matchCuenta(nombreCli, nitCli)
+          if (cuenta === "ambiguo") {
+            res.ambiguos.push(nombreCli)
+            continue
+          }
+          if (!cuenta) {
+            res.noEncontrados.push(nombreCli || nitCli)
+            continue
+          }
+
+          // Recolecta campos del entregable.
+          const data: Record<string, unknown> = {}
+          ecols.forEach((c, i) => {
+            if (!c || c.key === "cliente" || c.key === "nit" || c.key === "nombre") return
+            const raw = row[i] ?? ""
+            if (esPlaceholder(raw)) return
+            const value = coerceCol(c.tipo, raw)
+            if (value !== undefined) data[c.key] = value
+          })
+
+          const existing = await prisma.deliverable.findFirst({
+            where: { accountId: cuenta.id, nombre: nombreEnt },
+            select: { id: true },
+          })
+          if (existing) {
+            await prisma.deliverable.update({ where: { id: existing.id }, data })
+          } else {
+            await prisma.deliverable.create({
+              data: {
+                accountId: cuenta.id,
+                nombre: nombreEnt,
+                frecuencia: (data.frecuencia as string) ?? "Mensual",
+                categoria: (data.categoria as string) ?? null,
+                responsable: (data.responsable as string) ?? null,
+                proximaEntrega: (data.proximaEntrega as Date) ?? null,
+                notificarDiasAntes: (data.notificarDiasAntes as number) ?? 5,
+              },
+            })
+          }
+          res.entregables++
+        }
       }
     }
 

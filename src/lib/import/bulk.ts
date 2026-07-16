@@ -7,7 +7,7 @@
 //  - matchName/matchNit: identifican al cliente · computed/ignore: no se importan
 // Match del cliente por NOMBRE exacto (o NIT). Sin imports de servidor.
 
-import { INDUSTRIAS, TAMANOS_EMPRESA } from "@/lib/constants"
+import { INDUSTRIAS, TAMANOS_EMPRESA, TIPOS_ENTREGABLE, FRECUENCIAS_ENTREGABLE } from "@/lib/constants"
 
 export const TIPOS_SOLUCION = ["Producto", "Licenciamiento", "Servicios"]
 export const TIPOS_FACTURACION = ["Mensual", "Bimestral", "Trimestral", "Semestral", "Anual", "Único pago", "Por consumo"]
@@ -74,6 +74,35 @@ export const IMPORT_COLUMNS: ImportColumn[] = [
   { header: "Caso de Éxito", seccion: "Customer Success", destino: "Cliente", tipo: "boolean", target: { kind: "account", key: "cr_bex_casoexito" }, ejemplo: "No", opciones: SI_NO },
   { header: "Observaciones", seccion: "Observaciones", destino: "Cliente", tipo: "text", target: { kind: "account", key: "description" }, ejemplo: "Renovación en julio 2026" },
 ]
+
+// ─── Hoja 2: Entregables (valor agregado) ─────────────────────────────────────────
+// Una fila por entregable (un cliente aparece varias veces). Match por Cliente/NIT.
+export const ENTREGABLE_SHEET = "Entregables"
+export type EntregableColKey =
+  | "cliente" | "nit" | "nombre" | "categoria" | "frecuencia" | "responsable" | "proximaEntrega" | "notificarDiasAntes"
+
+export type EntregableColumn = { header: string; key: EntregableColKey; tipo: ColTipo; ejemplo: string; opciones?: string[] }
+
+export const ENTREGABLE_COLUMNS: EntregableColumn[] = [
+  { header: "Cliente", key: "cliente", tipo: "text", ejemplo: "Universidad de los Andes" },
+  { header: "NIT", key: "nit", tipo: "text", ejemplo: "860.000.000-0" },
+  { header: "Entregable", key: "nombre", tipo: "text", ejemplo: "Informe de gestión de mesa", opciones: [...TIPOS_ENTREGABLE] },
+  { header: "Categoría", key: "categoria", tipo: "text", ejemplo: "Soporte" },
+  { header: "Frecuencia", key: "frecuencia", tipo: "text", ejemplo: "Mensual", opciones: [...FRECUENCIAS_ENTREGABLE] },
+  { header: "Responsable", key: "responsable", tipo: "text", ejemplo: "Ana CSM" },
+  { header: "Próxima entrega", key: "proximaEntrega", tipo: "date", ejemplo: "2026-08-05" },
+  { header: "Notificar días antes", key: "notificarDiasAntes", tipo: "int", ejemplo: "5" },
+]
+
+const ENTREGABLE_BY_NORM = new Map<string, EntregableColumn>()
+for (const c of ENTREGABLE_COLUMNS) ENTREGABLE_BY_NORM.set(normHeader(c.header), c)
+
+export function resolveEntregableHeader(header: string): EntregableColumn | null {
+  const n = normHeader(header)
+  if (NAME_ALIASES.includes(n)) return ENTREGABLE_COLUMNS[0] // "cliente"
+  if (NIT_ALIASES.includes(n)) return ENTREGABLE_COLUMNS[1]
+  return ENTREGABLE_BY_NORM.get(n) ?? null
+}
 
 // Normaliza encabezados/nombres: sin acentos, minúsculas, sin espacios extra.
 export function normHeader(s: string): string {

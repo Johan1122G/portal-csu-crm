@@ -40,6 +40,7 @@ test("la ficha 360 abre cada tab sin error", async ({ page }) => {
     "Gestiones CS",
     "Oportunidades",
     "Plan / Tareas",
+    "Valor agregado",
     "Insights (IA)",
   ]
   for (const name of tabs) {
